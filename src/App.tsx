@@ -3,12 +3,15 @@ import { Navigation } from './components/ui/navigation';
 import { MyFinances } from './components/modules/MyFinances';
 import { SavingsInvestments } from './components/modules/SavingsInvestments';
 import { PersonalFinancialManagement } from './components/modules/PersonalFinancialManagement';
+import { OnboardingModule } from './components/onboarding/OnboardingModule';
 
 function App() {
-  const [activeModule, setActiveModule] = useState('finances');
+  const [activeModule, setActiveModule] = useState('onboarding');
 
   const renderModule = () => {
     switch (activeModule) {
+      case 'onboarding':
+        return <OnboardingModule />;
       case 'finances':
         return <MyFinances />;
       case 'savings':
@@ -16,9 +19,14 @@ function App() {
       case 'management':
         return <PersonalFinancialManagement />;
       default:
-        return <MyFinances />;
+        return <OnboardingModule />;
     }
   };
+
+  // Show onboarding without navigation for demo
+  if (activeModule === 'onboarding') {
+    return renderModule();
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
