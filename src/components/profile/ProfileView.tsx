@@ -1,6 +1,6 @@
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { User, Mail, Phone, MapPin, Briefcase, CreditCard, FileText, Edit, Download, Eye } from 'lucide-react';
+import { User, Mail, Phone, MapPin, Briefcase, CreditCard, FileText, CreditCard as Edit, Download, Eye } from 'lucide-react';
 import { useOnboardingStore } from '@/stores/onboardingStore';
 import { formatCurrency } from '@/lib/utils';
 import { useState } from 'react';
