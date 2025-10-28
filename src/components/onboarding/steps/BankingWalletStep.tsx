@@ -2,6 +2,7 @@ import { useForm } from 'react-hook-form';
 import { useOnboardingStore } from '@/stores/onboardingStore';
 import { MOBILE_NETWORKS, BANKS } from '@/types/onboarding';
 import { Button } from '@/components/ui/button';
+import { MonthYearPicker } from '@/components/ui/month-year-picker';
 import { ArrowRight, ArrowLeft, Wallet, CreditCard } from 'lucide-react';
 import { useEffect } from 'react';
 
@@ -185,10 +186,11 @@ export function BankingWalletStep() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Expiry Date
                 </label>
-                <input
-                  type="month"
-                  {...register('cardExpiryDate')}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                <MonthYearPicker
+                  value={formData.cardExpiryDate || ''}
+                  onChange={(value) => setValue('cardExpiryDate', value)}
+                  placeholder="MM/YY"
+                  className="w-full"
                 />
               </div>
             </div>

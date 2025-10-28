@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils';
-import { Wallet, PiggyBank, TrendingUp, Menu, X } from 'lucide-react';
+import { Wallet, PiggyBank, TrendingUp, Menu, X, User } from 'lucide-react';
 import { useState } from 'react';
 
 interface NavigationProps {
@@ -11,6 +11,7 @@ const modules = [
   { id: 'finances', name: 'My Finances', icon: Wallet },
   { id: 'savings', name: 'Savings & Investments', icon: PiggyBank },
   { id: 'management', name: 'Personal Financial Management', icon: TrendingUp },
+  { id: 'profile', name: 'Profile', icon: User },
 ];
 
 export function Navigation({ activeModule, onModuleChange }: NavigationProps) {

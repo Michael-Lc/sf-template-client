@@ -1,18 +1,66 @@
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { ViewToggle } from '@/components/ui/view-toggle';
+import { Filters } from '@/components/ui/filters';
 import { Users, Plus, RotateCcw, Calendar, DollarSign, Settings, FileText } from 'lucide-react';
 import { useRotationalSusuStore } from '@/stores/rotationalSusuStore';
 import { formatCurrency } from '@/lib/utils';
+import { useState, useEffect } from 'react';
 
 export function RotationalSusuOverview() {
   const { groups, setIsCreatingGroup, setActiveGroup } = useRotationalSusuStore();
+  
+  const [view, setView] = useState<'card' | 'table'>(() => {
+    return (localStorage.getItem('rotationalSusuView') as 'card' | 'table') || 'card';
+  });
+  
+  const [filters, setFilters] = useState({
+    status: '',
+    startDate: '',
+    endDate: '',
+    fundingSource: ''
+  });
+
+  useEffect(() => {
+    localStorage.setItem('rotationalSusuView', view);
+  }, [view]);
   
   const activeGroups = groups.filter(group => group.status === 'active');
   const pendingGroups = groups.filter(group => group.status === 'pending');
   const totalBalance = activeGroups.reduce((sum, group) => sum + group.totalBalance, 0);
   const totalMembers = activeGroups.reduce((sum, group) => sum + group.members.length, 0);
 
+  // Filter groups based on filters
+  const filteredGroups = groups.filter(group => {
+    if (filters.status && group.status !== filters.status) return false;
+    if (filters.startDate && group.createdAt < filters.startDate) return false;
+    if (filters.endDate && group.createdAt > filters.endDate) return false;
+    return true;
+  });
+
+  const statusOptions = [
+    { value: 'active', label: 'Active' },
+    { value: 'pending', label: 'Pending' },
+    { value: 'paused', label: 'Paused' },
+    { value: 'completed', label: 'Completed' }
+  ];
+
+  const fundingSourceOptions = [
+    { value: 'payroll', label: 'Payroll Debit' },
+    { value: 'wallet', label: 'Smiggle Wallet' },
+    { value: 'momo', label: 'Mobile Money' },
+    { value: 'card', label: 'Bank Card' }
+  ];
+
+  const resetFilters = () => {
+    setFilters({
+      status: '',
+      startDate: '',
+      endDate: '',
+      fundingSource: ''
+    });
+  };
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'active': return 'bg-green-100 text-green-700 border-green-200';
@@ -107,25 +155,44 @@ export function RotationalSusuOverview() {
         </Card>
       </div>
 
+      {/* Filters */}
+      <Filters
+        filters={filters}
+        onFiltersChange={setFilters}
+        onResetFilters={resetFilters}
+        statusOptions={statusOptions}
+        fundingSourceOptions={fundingSourceOptions}
+      />
+
+      {/* View Toggle */}
+      <div className="flex justify-end">
+        <ViewToggle view={view} onViewChange={setView} />
+      </div>
+
       {/* Groups List */}
       <div className="space-y-4">
         <h3 className="text-lg font-semibold text-gray-900">Your Groups</h3>
         
-        {groups.length === 0 ? (
+        {filteredGroups.length === 0 ? (
           <Card className="p-12 text-center">
             <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">No Groups Yet</h3>
-            <p className="text-gray-600 mb-6">Create your first rotational susu group to start saving together</p>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">No Groups Found</h3>
+            <p className="text-gray-600 mb-6">
+              {Object.values(filters).some(v => v) 
+                ? "No groups match your current filters. Try adjusting your search criteria."
+                : "Create your first rotational susu group to start saving together"
+              }
+            </p>
             <button
               onClick={() => setIsCreatingGroup(true)}
               className="px-6 py-3 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-colors"
             >
-              Create Your First Group
+              Create New Group
             </button>
           </Card>
-        ) : (
+        ) : view === 'card' ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {groups.map((group) => (
+            {filteredGroups.map((group) => (
               <Card 
                 key={group.id} 
                 className="p-6 cursor-pointer hover:shadow-lg transition-shadow"
@@ -175,6 +242,64 @@ export function RotationalSusuOverview() {
               </Card>
             ))}
           </div>
+        ) : (
+          <Card className="p-6">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left font-medium text-gray-700">Group Name</th>
+                    <th className="px-4 py-3 text-center font-medium text-gray-700">Members</th>
+                    <th className="px-4 py-3 text-right font-medium text-gray-700">Contribution</th>
+                    <th className="px-4 py-3 text-center font-medium text-gray-700">Frequency</th>
+                    <th className="px-4 py-3 text-center font-medium text-gray-700">Rotation Status</th>
+                    <th className="px-4 py-3 text-center font-medium text-gray-700">Next Payout</th>
+                    <th className="px-4 py-3 text-center font-medium text-gray-700">Duration</th>
+                    <th className="px-4 py-3 text-center font-medium text-gray-700">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {filteredGroups.map((group) => (
+                    <tr 
+                      key={group.id} 
+                      className="hover:bg-gray-50 cursor-pointer"
+                      onClick={() => setActiveGroup(group)}
+                    >
+                      <td className="px-4 py-3">
+                        <div>
+                          <p className="font-medium text-gray-900">{group.name}</p>
+                          <p className="text-xs text-gray-500">{group.description}</p>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-center text-gray-600">
+                        {group.members.length}/{group.maxMembers}
+                      </td>
+                      <td className="px-4 py-3 text-right font-medium text-gray-900">
+                        {formatCurrency(group.contributionAmount)}
+                      </td>
+                      <td className="px-4 py-3 text-center capitalize text-gray-600">
+                        {group.savingsFrequency}
+                      </td>
+                      <td className="px-4 py-3 text-center text-gray-600">
+                        {group.status === 'active' ? `Round ${group.currentRound}/${group.members.length}` : '-'}
+                      </td>
+                      <td className="px-4 py-3 text-center text-gray-600">
+                        {group.nextPayoutDate ? new Date(group.nextPayoutDate).toLocaleDateString() : '-'}
+                      </td>
+                      <td className="px-4 py-3 text-center text-gray-600">
+                        {group.durationPerRound} weeks
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <Badge className={getStatusColor(group.status)}>
+                          {group.status}
+                        </Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
         )}
       </div>
 

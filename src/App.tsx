@@ -3,6 +3,7 @@ import { Navigation } from './components/ui/navigation';
 import { MyFinances } from './components/modules/MyFinances';
 import { SavingsInvestments } from './components/modules/SavingsInvestments';
 import { PersonalFinancialManagement } from './components/modules/PersonalFinancialManagement';
+import { ProfileModule } from './components/profile/ProfileModule';
 import { OnboardingModule } from './components/onboarding/OnboardingModule';
 
 function App() {
@@ -18,6 +19,8 @@ function App() {
         return <SavingsInvestments />;
       case 'management':
         return <PersonalFinancialManagement />;
+      case 'profile':
+        return <ProfileModule />;
       default:
         return <OnboardingModule />;
     }
