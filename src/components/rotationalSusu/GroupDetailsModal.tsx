@@ -1,18 +1,37 @@
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { X, Users, DollarSign, Calendar, Settings, FileText, Download, Mail, MessageCircle } from 'lucide-react';
+import { X, Users, DollarSign, Calendar, Settings, FileText, Download, Mail, MessageCircle, RotateCcw, ChevronDown, ChevronRight } from 'lucide-react';
 import { useRotationalSusuStore } from '@/stores/rotationalSusuStore';
 import { formatCurrency } from '@/lib/utils';
+import { useState } from 'react';
 
 export function GroupDetailsModal() {
-  const { activeGroup, setActiveGroup, getGroupContributions, getGroupPayouts, generateReport } = useRotationalSusuStore();
+  const { 
+    activeGroup, 
+    setActiveGroup, 
+    getGroupContributions, 
+    getGroupPayouts, 
+    getCycleContributions,
+    getCyclePayouts,
+    generateReport,
+    setIsRestartingCycle,
+    selectedCycle,
+    setSelectedCycle
+  } = useRotationalSusuStore();
+  
+  const [activeTab, setActiveTab] = useState('members');
+  const [expandedCycle, setExpandedCycle] = useState<string | null>(null);
   
   if (!activeGroup) return null;
 
-  const contributions = getGroupContributions(activeGroup.id);
-  const payouts = getGroupPayouts(activeGroup.id);
+  const allContributions = getGroupContributions(activeGroup.id);
+  const allPayouts = getGroupPayouts(activeGroup.id);
   const cycleProgress = (activeGroup.currentRound / activeGroup.members.length) * 100;
+  
+  const currentCycle = activeGroup.cycles.find(c => c.cycleNumber === activeGroup.currentCycle);
+  const isAdmin = activeGroup.adminId === 'current-user-id'; // In real app, get from auth
+  const canStartNewCycle = isAdmin && currentCycle?.status === 'completed';
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -22,6 +41,7 @@ export function GroupDetailsModal() {
       case 'invited': return 'bg-gray-100 text-gray-700 border-gray-200';
       case 'paid': return 'bg-green-100 text-green-700 border-green-200';
       case 'overdue': return 'bg-red-100 text-red-700 border-red-200';
+      case 'completed': return 'bg-blue-100 text-blue-700 border-blue-200';
       default: return 'bg-gray-100 text-gray-700 border-gray-200';
     }
   };
@@ -31,6 +51,9 @@ export function GroupDetailsModal() {
     console.log('Generated report:', report);
   };
 
+  const toggleCycleExpansion = (cycleId: string) => {
+    setExpandedCycle(expandedCycle === cycleId ? null : cycleId);
+  };
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <Card className="w-full max-w-6xl max-h-[90vh] overflow-y-auto">
@@ -45,6 +68,15 @@ export function GroupDetailsModal() {
               <Badge className={getStatusColor(activeGroup.status)}>
                 {activeGroup.status}
               </Badge>
+              {canStartNewCycle && (
+                <button
+                  onClick={() => setIsRestartingCycle(true)}
+                  className="flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-colors"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  <span>Start New Cycle</span>
+                </button>
+              )}
               <button
                 onClick={() => setActiveGroup(null)}
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -149,8 +181,8 @@ export function GroupDetailsModal() {
             </div>
           </div>
 
-          {/* Members Table */}
-          <div className="mb-8">
+          {/* Tab Content */}
+          {activeTab === 'members' && (
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-900">Group Members</h3>
               <div className="flex space-x-2">
@@ -221,10 +253,10 @@ export function GroupDetailsModal() {
                 </tbody>
               </table>
             </div>
-          </div>
+          )}
 
-          {/* Recent Contributions */}
-          <div className="mb-8">
+          {activeTab === 'contributions' && (
+            <div>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-900">Recent Contributions</h3>
               <button
@@ -236,61 +268,228 @@ export function GroupDetailsModal() {
               </button>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left font-medium text-gray-700">Member</th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-700">Due Date</th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-700">Paid Date</th>
-                    <th className="px-4 py-3 text-right font-medium text-gray-700">Amount</th>
-                    <th className="px-4 py-3 text-center font-medium text-gray-700">Status</th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-700">Source</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {contributions.map((contribution) => (
-                    <tr key={contribution.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 font-medium text-gray-900">{contribution.memberName}</td>
-                      <td className="px-4 py-3 text-gray-600">{new Date(contribution.dueDate).toLocaleDateString()}</td>
-                      <td className="px-4 py-3 text-gray-600">
-                        {contribution.paidDate ? new Date(contribution.paidDate).toLocaleDateString() : '-'}
-                      </td>
-                      <td className="px-4 py-3 text-right font-medium text-gray-900">
-                        {formatCurrency(contribution.amount)}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <Badge className={getStatusColor(contribution.status)}>
-                          {contribution.status}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3 text-gray-600">{contribution.fundingSource}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              {activeGroup.cycles.length === 1 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left font-medium text-gray-700">Member</th>
+                        <th className="px-4 py-3 text-left font-medium text-gray-700">Due Date</th>
+                        <th className="px-4 py-3 text-left font-medium text-gray-700">Paid Date</th>
+                        <th className="px-4 py-3 text-right font-medium text-gray-700">Amount</th>
+                        <th className="px-4 py-3 text-center font-medium text-gray-700">Status</th>
+                        <th className="px-4 py-3 text-left font-medium text-gray-700">Source</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {allContributions.map((contribution) => (
+                        <tr key={contribution.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-3 font-medium text-gray-900">{contribution.memberName}</td>
+                          <td className="px-4 py-3 text-gray-600">{new Date(contribution.dueDate).toLocaleDateString()}</td>
+                          <td className="px-4 py-3 text-gray-600">
+                            {contribution.paidDate ? new Date(contribution.paidDate).toLocaleDateString() : '-'}
+                          </td>
+                          <td className="px-4 py-3 text-right font-medium text-gray-900">
+                            {formatCurrency(contribution.amount)}
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <Badge className={getStatusColor(contribution.status)}>
+                              {contribution.status}
+                            </Badge>
+                          </td>
+                          <td className="px-4 py-3 text-gray-600">{contribution.fundingSource}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {activeGroup.cycles.map((cycle) => {
+                    const cycleContributions = getCycleContributions(activeGroup.id, cycle.id);
+                    const isExpanded = expandedCycle === cycle.id;
+                    
+                    return (
+                      <Card key={cycle.id} className="overflow-hidden">
+                        <button
+                          onClick={() => toggleCycleExpansion(cycle.id)}
+                          className="w-full p-4 text-left hover:bg-gray-50 transition-colors"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-3">
+                              {isExpanded ? (
+                                <ChevronDown className="w-5 h-5 text-gray-500" />
+                              ) : (
+                                <ChevronRight className="w-5 h-5 text-gray-500" />
+                              )}
+                              <div>
+                                <h4 className="text-lg font-semibold text-gray-900">Cycle {cycle.cycleNumber}</h4>
+                                <p className="text-sm text-gray-600">
+                                  {new Date(cycle.startDate).toLocaleDateString()} - 
+                                  {cycle.endDate ? new Date(cycle.endDate).toLocaleDateString() : 'Ongoing'}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center space-x-4">
+                              <div className="text-right">
+                                <p className="text-sm text-gray-600">Total Contributions</p>
+                                <p className="font-semibold text-gray-900">{formatCurrency(cycle.totalContributions)}</p>
+                              </div>
+                              <Badge className={getStatusColor(cycle.status)}>
+                                {cycle.status}
+                              </Badge>
+                            </div>
+                          </div>
+                        </button>
+                        
+                        {isExpanded && (
+                          <div className="border-t border-gray-200 p-4">
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-sm">
+                                <thead className="bg-gray-50">
+                                  <tr>
+                                    <th className="px-4 py-3 text-left font-medium text-gray-700">Member</th>
+                                    <th className="px-4 py-3 text-left font-medium text-gray-700">Due Date</th>
+                                    <th className="px-4 py-3 text-left font-medium text-gray-700">Paid Date</th>
+                                    <th className="px-4 py-3 text-right font-medium text-gray-700">Amount</th>
+                                    <th className="px-4 py-3 text-center font-medium text-gray-700">Status</th>
+                                    <th className="px-4 py-3 text-left font-medium text-gray-700">Source</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-200">
+                                  {cycleContributions.map((contribution) => (
+                                    <tr key={contribution.id} className="hover:bg-gray-50">
+                                      <td className="px-4 py-3 font-medium text-gray-900">{contribution.memberName}</td>
+                                      <td className="px-4 py-3 text-gray-600">{new Date(contribution.dueDate).toLocaleDateString()}</td>
+                                      <td className="px-4 py-3 text-gray-600">
+                                        {contribution.paidDate ? new Date(contribution.paidDate).toLocaleDateString() : '-'}
+                                      </td>
+                                      <td className="px-4 py-3 text-right font-medium text-gray-900">
+                                        {formatCurrency(contribution.amount)}
+                                      </td>
+                                      <td className="px-4 py-3 text-center">
+                                        <Badge className={getStatusColor(contribution.status)}>
+                                          {contribution.status}
+                                        </Badge>
+                                      </td>
+                                      <td className="px-4 py-3 text-gray-600">{contribution.fundingSource}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          </div>
+          )}
 
+          {activeTab === 'payouts' && (
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Payout History</h3>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => handleGenerateReport('payout')}
+                    className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Export PDF</span>
+                  </button>
+                  <button className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors">
+                    <FileText className="w-4 h-4" />
+                    <span>Export Excel</span>
+                  </button>
+                </div>
+            </div>
+              
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left font-medium text-gray-700">Member Name</th>
+                      <th className="px-4 py-3 text-right font-medium text-gray-700">Payout Amount</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-700">Payout Date</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-700">Payment Method</th>
+                      <th className="px-4 py-3 text-center font-medium text-gray-700">Cycle</th>
+                      <th className="px-4 py-3 text-center font-medium text-gray-700">Status</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-700">Reference ID</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {allPayouts.map((payout) => (
+                      <tr key={payout.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 font-medium text-gray-900">{payout.recipientName}</td>
+                        <td className="px-4 py-3 text-right font-medium text-gray-900">{formatCurrency(payout.amount)}</td>
+                        <td className="px-4 py-3 text-gray-600">{new Date(payout.payoutDate).toLocaleDateString()}</td>
+                        <td className="px-4 py-3 text-gray-600 capitalize">{payout.paymentMethod}</td>
+                        <td className="px-4 py-3 text-center">
+                          <Badge variant="outline">Cycle {payout.cycle}</Badge>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <Badge className={getStatusColor(payout.status)}>
+                            {payout.status}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-3 text-gray-600 font-mono text-xs">{payout.referenceId}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              
+              {/* Summary Footer */}
+              <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-gray-700">Total Payouts</span>
+                  <span className="text-lg font-bold text-gray-900">
+                    {formatCurrency(allPayouts.reduce((sum, payout) => sum + payout.amount, 0))}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'reports' && (
+            <div className="text-center py-8">
+              <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Generate Reports</h3>
+              <p className="text-gray-600 mb-6">Create detailed reports for your group's financial activity</p>
+              
+              <div className="flex flex-wrap gap-3 justify-center">
+                <button
+                  onClick={() => handleGenerateReport('savings')}
+                  className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors"
+                >
+                  <FileText className="w-4 h-4" />
+                  <span>Savings Report</span>
+                </button>
+                <button
+                  onClick={() => handleGenerateReport('payout')}
+                  className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Payout Report</span>
+                </button>
+                <button
+                  onClick={() => handleGenerateReport('penalty')}
+                  className="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
+                >
+                  <FileText className="w-4 h-4" />
+                  <span>Penalty Report</span>
+                </button>
+              </div>
+            </div>
+          )}
           {/* Action Buttons */}
           <div className="flex flex-wrap gap-3 justify-center pt-6 border-t border-gray-200">
             <button className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors">
               <Settings className="w-4 h-4" />
               <span>Group Settings</span>
-            </button>
-            <button
-              onClick={() => handleGenerateReport('payout')}
-              className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors"
-            >
-              <Download className="w-4 h-4" />
-              <span>Payout Report</span>
-            </button>
-            <button
-              onClick={() => handleGenerateReport('penalty')}
-              className="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
-            >
-              <FileText className="w-4 h-4" />
-              <span>Penalty Report</span>
             </button>
             <button className="flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-colors">
               <Mail className="w-4 h-4" />

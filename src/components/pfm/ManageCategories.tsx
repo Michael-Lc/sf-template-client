@@ -52,6 +52,7 @@ export function ManageCategories() {
       isCustom: true,
       parentId: editingCategory?.id || Date.now().toString(),
       alertThreshold: formData.alertThreshold,
+      budgetPercentage: sub.budgetPercentage,
       subcategories: []
     }));
     
@@ -82,6 +83,7 @@ export function ManageCategories() {
   };
   
   const addSubcategory = () => {
+    if (subcategories.length >= 10) return; // Max 10 subcategories
     setSubcategories([...subcategories, { name: '', budgetPercentage: 0 }]);
   };
   
@@ -105,6 +107,15 @@ export function ManageCategories() {
     });
     setEditingCategory(category);
     setIsCreating(true);
+    
+    // Load existing subcategories for editing
+    if (category.subcategories && category.subcategories.length > 0) {
+      setShowSubcategoryForm(true);
+      setSubcategories(category.subcategories.map(sub => ({
+        name: sub.name,
+        budgetPercentage: sub.budgetPercentage || 0
+      })));
+    }
   };
 
   const handleDelete = (categoryId: string) => {
@@ -127,6 +138,9 @@ export function ManageCategories() {
   const customCategories = categories.filter(cat => cat.isCustom);
   const predefinedCategories = categories.filter(cat => !cat.isCustom);
 
+  const getTotalSubcategoryPercentage = () => {
+    return subcategories.reduce((sum, sub) => sum + (sub.budgetPercentage || 0), 0);
+  };
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -270,7 +284,8 @@ export function ManageCategories() {
                   <button
                     type="button"
                     onClick={addSubcategory}
-                    className="flex items-center space-x-1 px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
+                    disabled={subcategories.length >= 10}
+                    className="flex items-center space-x-1 px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Plus className="w-3 h-3" />
                     <span>Add Subcategory</span>
@@ -284,6 +299,14 @@ export function ManageCategories() {
                     Create subcategories for more detailed expense tracking (max 10)
                   </p>
                   
+                  {getTotalSubcategoryPercentage() > 100 && (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <p className="text-sm text-red-700">
+                        ⚠️ Total subcategory percentages exceed 100%. Please adjust the allocations.
+                      </p>
+                    </div>
+                  )}
+                  
                   {subcategories.map((subcategory, index) => (
                     <div key={index} className="flex items-center space-x-3 p-3 bg-white rounded border">
                       <div className="flex-1">
@@ -295,16 +318,17 @@ export function ManageCategories() {
                           className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                         />
                       </div>
-                      <div className="w-24">
+                      <div className="w-32">
                         <input
                           type="number"
-                          placeholder="% of parent"
+                          placeholder="% of budget"
                           min="0"
                           max="100"
                           value={subcategory.budgetPercentage}
                           onChange={(e) => updateSubcategory(index, 'budgetPercentage', parseInt(e.target.value) || 0)}
                           className="w-full px-2 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                         />
+                        <p className="text-xs text-gray-500 mt-1">% of parent budget</p>
                       </div>
                       <button
                         type="button"
@@ -327,6 +351,21 @@ export function ManageCategories() {
                       Maximum of 10 subcategories allowed per category
                     </p>
                   )}
+                  
+                  {subcategories.length > 0 && (
+                    <div className="pt-3 border-t border-gray-200">
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-gray-600">Total Allocation:</span>
+                        <span className={cn(
+                          "font-medium",
+                          getTotalSubcategoryPercentage() > 100 ? "text-red-600" : 
+                          getTotalSubcategoryPercentage() === 100 ? "text-green-600" : "text-gray-900"
+                        )}>
+                          {getTotalSubcategoryPercentage()}%
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -334,7 +373,8 @@ export function ManageCategories() {
             <div className="flex items-center space-x-3 pt-4">
               <button
                 type="submit"
-                className="flex items-center space-x-2 px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+                disabled={showSubcategoryForm && getTotalSubcategoryPercentage() > 100}
+                className="flex items-center space-x-2 px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Save className="w-4 h-4" />
                 <span>{editingCategory ? 'Update Category' : 'Create Category'}</span>
@@ -378,7 +418,12 @@ export function ManageCategories() {
                     <span className="text-lg">{category.icon}</span>
                     <div>
                       <p className="font-medium text-gray-900">{category.name}</p>
-                      <p className="text-xs text-gray-500">Alert at {category.alertThreshold}%</p>
+                      <div className="flex items-center space-x-2 text-xs text-gray-500">
+                        <span>Alert at {category.alertThreshold}%</span>
+                        {category.subcategories.length > 0 && (
+                          <span>• {category.subcategories.length} subcategories</span>
+                        )}
+                      </div>
                     </div>
                   </div>
                   <div className="flex items-center space-x-2">
@@ -459,7 +504,12 @@ export function ManageCategories() {
                       <div key={subcategory.id} className="flex items-center justify-between p-2 bg-white rounded border border-gray-200">
                         <div className="flex items-center space-x-2">
                           <span className="text-sm">{subcategory.icon}</span>
-                          <span className="text-sm text-gray-700">{subcategory.name}</span>
+                          <div>
+                            <span className="text-sm text-gray-700">{subcategory.name}</span>
+                            {subcategory.budgetPercentage && (
+                              <span className="text-xs text-gray-500 ml-2">({subcategory.budgetPercentage}%)</span>
+                            )}
+                          </div>
                           {subcategory.isCustom && (
                             <Badge variant="outline" className="text-xs">Custom</Badge>
                           )}

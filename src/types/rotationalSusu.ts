@@ -21,6 +21,7 @@ export interface SusuGroup {
   currentRound: number;
   startDate?: string;
   nextPayoutDate?: string;
+  cycles: SusuCycle[];
   
   // Members
   members: SusuMember[];
@@ -28,6 +29,17 @@ export interface SusuGroup {
   totalBalance: number;
 }
 
+export interface SusuCycle {
+  id: string;
+  cycleNumber: number;
+  startDate: string;
+  endDate?: string;
+  status: 'active' | 'completed' | 'cancelled';
+  totalContributions: number;
+  totalPayouts: number;
+  createdAt: string;
+  completedAt?: string;
+}
 export interface SusuMember {
   id: string;
   userId: string;
@@ -52,6 +64,7 @@ export interface SusuMember {
 export interface SusuContribution {
   id: string;
   groupId: string;
+  cycleId: string;
   memberId: string;
   memberName: string;
   amount: number;
@@ -68,14 +81,17 @@ export interface SusuContribution {
 export interface SusuPayout {
   id: string;
   groupId: string;
+  cycleId: string;
   recipientId: string;
   recipientName: string;
   amount: number;
   payoutDate: string;
+  paymentMethod: 'wallet' | 'momo' | 'card' | 'bank';
   cycle: number;
   rotationOrder: number;
   status: 'scheduled' | 'paid' | 'failed';
   transactionId?: string;
+  referenceId?: string;
 }
 
 export interface SusuReport {

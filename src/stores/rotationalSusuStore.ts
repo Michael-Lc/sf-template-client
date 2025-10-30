@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { SusuGroup, SusuMember, SusuContribution, SusuPayout, SusuReport } from '../types/rotationalSusu';
+import { SusuGroup, SusuMember, SusuContribution, SusuPayout, SusuReport, SusuCycle } from '../types/rotationalSusu';
 
 interface RotationalSusuState {
   // Groups
@@ -14,21 +14,29 @@ interface RotationalSusuState {
   
   // UI State
   isCreatingGroup: boolean;
+  isRestartingCycle: boolean;
   currentStep: number;
   groupForm: Partial<SusuGroup>;
   selectedMembers: SusuMember[];
+  selectedCycle: SusuCycle | null;
   
   // Actions
   setActiveGroup: (group: SusuGroup | null) => void;
   setIsCreatingGroup: (creating: boolean) => void;
+  setIsRestartingCycle: (restarting: boolean) => void;
   setCurrentStep: (step: number) => void;
   updateGroupForm: (updates: Partial<SusuGroup>) => void;
   resetGroupForm: () => void;
+  setSelectedCycle: (cycle: SusuCycle | null) => void;
   
   // Group Management
   createGroup: (group: SusuGroup) => void;
   updateGroup: (id: string, updates: Partial<SusuGroup>) => void;
   deleteGroup: (id: string) => void;
+  
+  // Cycle Management
+  startNewCycle: (groupId: string) => void;
+  completeCycle: (groupId: string, cycleId: string) => void;
   
   // Member Management
   addMember: (groupId: string, member: SusuMember) => void;
@@ -40,11 +48,13 @@ interface RotationalSusuState {
   addContribution: (contribution: SusuContribution) => void;
   updateContribution: (id: string, updates: Partial<SusuContribution>) => void;
   getGroupContributions: (groupId: string) => SusuContribution[];
+  getCycleContributions: (groupId: string, cycleId: string) => SusuContribution[];
   
   // Payouts
   addPayout: (payout: SusuPayout) => void;
   updatePayout: (id: string, updates: Partial<SusuPayout>) => void;
   getGroupPayouts: (groupId: string) => SusuPayout[];
+  getCyclePayouts: (groupId: string, cycleId: string) => SusuPayout[];
   
   // Reports
   generateReport: (groupId: string, type: 'savings' | 'payout' | 'penalty') => SusuReport;
@@ -75,6 +85,17 @@ export const useRotationalSusuStore = create<RotationalSusuState>((set, get) => 
       nextPayoutDate: '2024-04-01',
       maxMembers: 8,
       totalBalance: 12000,
+      cycles: [
+        {
+          id: 'cycle1',
+          cycleNumber: 1,
+          startDate: '2024-01-01',
+          status: 'active',
+          totalContributions: 12000,
+          totalPayouts: 8000,
+          createdAt: '2024-01-01'
+        }
+      ],
       members: [
         {
           id: 'm1',
@@ -144,6 +165,17 @@ export const useRotationalSusuStore = create<RotationalSusuState>((set, get) => 
       currentRound: 1,
       maxMembers: 6,
       totalBalance: 0,
+      cycles: [
+        {
+          id: 'cycle2',
+          cycleNumber: 1,
+          startDate: '2024-02-01',
+          status: 'active',
+          totalContributions: 0,
+          totalPayouts: 0,
+          createdAt: '2024-02-01'
+        }
+      ],
       members: [
         {
           id: 'm4',
@@ -170,6 +202,7 @@ export const useRotationalSusuStore = create<RotationalSusuState>((set, get) => 
     {
       id: 'c1',
       groupId: '1',
+      cycleId: 'cycle1',
       memberId: 'm1',
       memberName: 'John Doe',
       amount: 500,
@@ -184,6 +217,7 @@ export const useRotationalSusuStore = create<RotationalSusuState>((set, get) => 
     {
       id: 'c2',
       groupId: '1',
+      cycleId: 'cycle1',
       memberId: 'm2',
       memberName: 'Jane Smith',
       amount: 500,
@@ -198,6 +232,7 @@ export const useRotationalSusuStore = create<RotationalSusuState>((set, get) => 
     {
       id: 'c3',
       groupId: '1',
+      cycleId: 'cycle1',
       memberId: 'm3',
       memberName: 'Mike Johnson',
       amount: 500,
@@ -213,26 +248,32 @@ export const useRotationalSusuStore = create<RotationalSusuState>((set, get) => 
     {
       id: 'p1',
       groupId: '1',
+      cycleId: 'cycle1',
       recipientId: 'm1',
       recipientName: 'John Doe',
       amount: 4000,
       payoutDate: '2024-01-01',
+      paymentMethod: 'wallet',
       cycle: 1,
       rotationOrder: 1,
       status: 'paid',
-      transactionId: 'PAY123456789'
+      transactionId: 'PAY123456789',
+      referenceId: 'REF001'
     },
     {
       id: 'p2',
       groupId: '1',
+      cycleId: 'cycle1',
       recipientId: 'm2',
       recipientName: 'Jane Smith',
       amount: 4000,
       payoutDate: '2024-02-01',
+      paymentMethod: 'momo',
       cycle: 1,
       rotationOrder: 2,
       status: 'paid',
-      transactionId: 'PAY123456790'
+      transactionId: 'PAY123456790',
+      referenceId: 'REF002'
     }
   ],
   
@@ -240,16 +281,20 @@ export const useRotationalSusuStore = create<RotationalSusuState>((set, get) => 
   
   // UI State
   isCreatingGroup: false,
+  isRestartingCycle: false,
   currentStep: 1,
   groupForm: {},
   selectedMembers: [],
+  selectedCycle: null,
   
   // Actions
   setActiveGroup: (group) => set({ activeGroup: group }),
   setIsCreatingGroup: (creating) => set({ isCreatingGroup: creating, currentStep: creating ? 1 : 0 }),
+  setIsRestartingCycle: (restarting) => set({ isRestartingCycle: restarting }),
   setCurrentStep: (step) => set({ currentStep: step }),
   updateGroupForm: (updates) => set((state) => ({ groupForm: { ...state.groupForm, ...updates } })),
   resetGroupForm: () => set({ groupForm: {}, currentStep: 1, selectedMembers: [] }),
+  setSelectedCycle: (cycle) => set({ selectedCycle: cycle }),
   
   // Group Management
   createGroup: (group) => set((state) => ({ groups: [...state.groups, group] })),
@@ -259,6 +304,54 @@ export const useRotationalSusuStore = create<RotationalSusuState>((set, get) => 
   deleteGroup: (id) => set((state) => ({
     groups: state.groups.filter(group => group.id !== id)
   })),
+  
+  // Cycle Management
+  startNewCycle: (groupId) => {
+    const group = get().groups.find(g => g.id === groupId);
+    if (!group) return;
+    
+    const newCycleNumber = Math.max(...group.cycles.map(c => c.cycleNumber)) + 1;
+    const newCycle: SusuCycle = {
+      id: `cycle${Date.now()}`,
+      cycleNumber: newCycleNumber,
+      startDate: new Date().toISOString().split('T')[0],
+      status: 'active',
+      totalContributions: 0,
+      totalPayouts: 0,
+      createdAt: new Date().toISOString()
+    };
+    
+    set((state) => ({
+      groups: state.groups.map(g => 
+        g.id === groupId 
+          ? { 
+              ...g, 
+              currentCycle: newCycleNumber,
+              currentRound: 1,
+              cycles: [...g.cycles, newCycle],
+              status: 'active'
+            }
+          : g
+      )
+    }));
+  },
+  
+  completeCycle: (groupId, cycleId) => {
+    set((state) => ({
+      groups: state.groups.map(g => 
+        g.id === groupId 
+          ? {
+              ...g,
+              cycles: g.cycles.map(c => 
+                c.id === cycleId 
+                  ? { ...c, status: 'completed', completedAt: new Date().toISOString() }
+                  : c
+              )
+            }
+          : g
+      )
+    }));
+  },
   
   // Member Management
   addMember: (groupId, member) => set((state) => ({
@@ -309,6 +402,10 @@ export const useRotationalSusuStore = create<RotationalSusuState>((set, get) => 
     return get().contributions.filter(contrib => contrib.groupId === groupId);
   },
   
+  getCycleContributions: (groupId, cycleId) => {
+    return get().contributions.filter(contrib => contrib.groupId === groupId && contrib.cycleId === cycleId);
+  },
+  
   // Payouts
   addPayout: (payout) => set((state) => ({
     payouts: [...state.payouts, payout]
@@ -322,6 +419,10 @@ export const useRotationalSusuStore = create<RotationalSusuState>((set, get) => 
   
   getGroupPayouts: (groupId) => {
     return get().payouts.filter(payout => payout.groupId === groupId);
+  },
+  
+  getCyclePayouts: (groupId, cycleId) => {
+    return get().payouts.filter(payout => payout.groupId === groupId && payout.cycleId === cycleId);
   },
   
   // Reports

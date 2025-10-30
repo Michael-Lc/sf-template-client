@@ -55,6 +55,7 @@ export interface ExpenseCategory {
   subcategories: ExpenseCategory[];
   budgetAmount?: number;
   alertThreshold: number;
+  budgetPercentage?: number; // For subcategories - percentage of parent budget
 }
 
 export interface FinancialSummary {
