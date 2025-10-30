@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Plus, CreditCard as Edit, Trash2, Folder, FolderOpen, Palette, Save, X } from 'lucide-react';
+import { Plus, CreditCard as Edit, Trash2, Folder, FolderOpen, Palette, Save, X, ChevronDown, ChevronRight } from 'lucide-react';
 import { usePFMStore } from '@/stores/pfmStore';
 import { ExpenseCategory } from '@/types/pfm';
 import { cn } from '@/lib/utils';
@@ -15,6 +15,8 @@ export function ManageCategories() {
   const [isCreating, setIsCreating] = useState(false);
   const [editingCategory, setEditingCategory] = useState<ExpenseCategory | null>(null);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  const [showSubcategoryForm, setShowSubcategoryForm] = useState(false);
+  const [subcategories, setSubcategories] = useState<Array<{name: string, budgetPercentage: number}>>([]);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -34,17 +36,32 @@ export function ManageCategories() {
     });
     setIsCreating(false);
     setEditingCategory(null);
+    setShowSubcategoryForm(false);
+    setSubcategories([]);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Create subcategories if any
+    const createdSubcategories: ExpenseCategory[] = subcategories.map((sub, index) => ({
+      id: `${Date.now()}-sub-${index}`,
+      name: sub.name,
+      color: formData.color,
+      icon: formData.icon,
+      isCustom: true,
+      parentId: editingCategory?.id || Date.now().toString(),
+      alertThreshold: formData.alertThreshold,
+      subcategories: []
+    }));
     
     if (editingCategory) {
       updateCategory(editingCategory.id, {
         name: formData.name,
         color: formData.color,
         icon: formData.icon,
-        alertThreshold: formData.alertThreshold
+        alertThreshold: formData.alertThreshold,
+        subcategories: [...(editingCategory.subcategories || []), ...createdSubcategories]
       });
     } else {
       const newCategory: ExpenseCategory = {
@@ -55,13 +72,27 @@ export function ManageCategories() {
         isCustom: true,
         parentId: formData.parentId || undefined,
         alertThreshold: formData.alertThreshold,
-        subcategories: []
+        subcategories: createdSubcategories
       };
       
       addCategory(newCategory);
     }
     
     resetForm();
+  };
+  
+  const addSubcategory = () => {
+    setSubcategories([...subcategories, { name: '', budgetPercentage: 0 }]);
+  };
+  
+  const removeSubcategory = (index: number) => {
+    setSubcategories(subcategories.filter((_, i) => i !== index));
+  };
+  
+  const updateSubcategory = (index: number, field: 'name' | 'budgetPercentage', value: string | number) => {
+    const updated = [...subcategories];
+    updated[index] = { ...updated[index], [field]: value };
+    setSubcategories(updated);
   };
 
   const handleEdit = (category: ExpenseCategory) => {
@@ -222,6 +253,83 @@ export function ManageCategories() {
                 Get alerts when spending reaches this percentage of your budget
               </p>
             </div>
+            
+            {/* Subcategories Section */}
+            <div className="pt-4 border-t border-gray-200">
+              <div className="flex items-center justify-between mb-4">
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    checked={showSubcategoryForm}
+                    onChange={(e) => setShowSubcategoryForm(e.target.checked)}
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <span className="text-sm font-medium text-gray-700">Add Subcategories</span>
+                </label>
+                {showSubcategoryForm && (
+                  <button
+                    type="button"
+                    onClick={addSubcategory}
+                    className="flex items-center space-x-1 px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>Add Subcategory</span>
+                  </button>
+                )}
+              </div>
+              
+              {showSubcategoryForm && (
+                <div className="space-y-3 p-4 bg-gray-50 rounded-lg">
+                  <p className="text-xs text-gray-600 mb-3">
+                    Create subcategories for more detailed expense tracking (max 10)
+                  </p>
+                  
+                  {subcategories.map((subcategory, index) => (
+                    <div key={index} className="flex items-center space-x-3 p-3 bg-white rounded border">
+                      <div className="flex-1">
+                        <input
+                          type="text"
+                          placeholder="Subcategory name"
+                          value={subcategory.name}
+                          onChange={(e) => updateSubcategory(index, 'name', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                        />
+                      </div>
+                      <div className="w-24">
+                        <input
+                          type="number"
+                          placeholder="% of parent"
+                          min="0"
+                          max="100"
+                          value={subcategory.budgetPercentage}
+                          onChange={(e) => updateSubcategory(index, 'budgetPercentage', parseInt(e.target.value) || 0)}
+                          className="w-full px-2 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeSubcategory(index)}
+                        className="p-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                  
+                  {subcategories.length === 0 && (
+                    <div className="text-center py-4 text-gray-500 text-sm">
+                      No subcategories added yet. Click "Add Subcategory" to get started.
+                    </div>
+                  )}
+                  
+                  {subcategories.length >= 10 && (
+                    <p className="text-xs text-amber-600">
+                      Maximum of 10 subcategories allowed per category
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
 
             <div className="flex items-center space-x-3 pt-4">
               <button
@@ -352,11 +460,32 @@ export function ManageCategories() {
                         <div className="flex items-center space-x-2">
                           <span className="text-sm">{subcategory.icon}</span>
                           <span className="text-sm text-gray-700">{subcategory.name}</span>
+                          {subcategory.isCustom && (
+                            <Badge variant="outline" className="text-xs">Custom</Badge>
+                          )}
                         </div>
-                        <div
-                          className="w-3 h-3 rounded-full border border-gray-300"
-                          style={{ backgroundColor: subcategory.color }}
-                        />
+                        <div className="flex items-center space-x-2">
+                          <div
+                            className="w-3 h-3 rounded-full border border-gray-300"
+                            style={{ backgroundColor: subcategory.color }}
+                          />
+                          {subcategory.isCustom && (
+                            <div className="flex space-x-1">
+                              <button
+                                onClick={() => handleEdit(subcategory)}
+                                className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded"
+                              >
+                                <Edit className="w-3 h-3" />
+                              </button>
+                              <button
+                                onClick={() => handleDelete(subcategory.id)}
+                                className="p-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
